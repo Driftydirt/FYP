@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">FYP</string>
+    <string name="title_activity_maps">MapsActivity</string>
+    <string name="reset_view">Reset View</string>
+</resources>
