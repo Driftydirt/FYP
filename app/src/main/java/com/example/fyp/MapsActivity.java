@@ -256,19 +256,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             } else {
                 sources.add(new SignalSource(getWifiName()));
-                if(sources.size() == 1) {
+                if (sources.size() == 1) {
                     currentSource = sources.get(0).getName();
                 }
             }
         }
         if (dataConnected) {
-            if(checkSources(getDataName())) {
+            if (checkSources(getDataName())) {
 
             } else if (getDataName() == null) {
 
             } else {
                 sources.add(new SignalSource(getDataName()));
-                if(sources.size() == 1) {
+                if (sources.size() == 1) {
                     currentSource = sources.get(0).getName();
                 }
             }
@@ -302,7 +302,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private void createHeatmap(List<SignalStrengthLocation> locations) {
         List<WeightedLatLng> latLngs = getHeatmapData(locations);
-        if(latLngs.size() == 0) {
+        if (latLngs.size() == 0) {
 
         } else {
             int[] colours = {
@@ -335,7 +335,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (currentLatLng == null) {
             cameraPosition = CameraPosition.builder().target(new LatLng(51, 0)).bearing(0).zoom(5).build();
         } else {
-            cameraPosition = CameraPosition.builder().target(currentLatLng).bearing(0).zoom(20).build();
+            cameraPosition = CameraPosition.builder().target(currentLatLng).bearing(0).zoom(17).build();
         }
         mMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 
