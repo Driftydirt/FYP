@@ -1,3 +1,4 @@
+
 package com.example.fyp;
 
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
@@ -20,6 +21,7 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
+import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -86,6 +88,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private HeatmapTileProvider heatmapTileProvider;
     private TileOverlay overlay;
     private String currentSource;
+    private boolean wifiConnected;
+    private boolean dataConnected;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,14 +97,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         context = getApplicationContext();
 
 
-
         wifi = (WifiManager) context.getSystemService(context.WIFI_SERVICE);
         connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         telephonyManager = (TelephonyManager) context.getSystemService(context.TELEPHONY_SERVICE);
+        sources = new ArrayList<>();
+        generateSignalSources();
 
-        sources = generateSignalSources();
+        if (sources.size() != 0) {
+            currentSource = sources.get(0).getName();
+        }
 
-        currentSource = getWifiName();
 
         binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -111,9 +117,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
         wifiTextView = findViewById(R.id.wifi_text);
-        wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", getWifiLevel()));
+        checkConnectionStatus();
+        if (wifiConnected) {
+            wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", getWifiLevel()));
+        } else {
+            wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", "Disconnected"));
+        }
+
         dataTextView = findViewById(R.id.data_text);
-        dataTextView.setText(MessageFormat.format("Data Strength: {0}", getDataLevel()));
+        if (dataConnected) {
+            dataTextView.setText(MessageFormat.format("Data Strength: {0}", getDataLevel()));
+        } else {
+            dataTextView.setText(MessageFormat.format("Data Strength: {0}", "Disconnected"));
+        }
+
+        final Button swap_source = findViewById(R.id.button_swap);
+        swap_source.setOnClickListener(v -> getNextSource());
         final Button button = findViewById(R.id.location);
         button.setOnClickListener(v -> resetView());
         locationCallback = new LocationCallback() {
@@ -125,12 +144,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
                 for (Location location : locationResult.getLocations()) {
                     currentLocation = location;
+                    generateSignalSources();
+                    checkConnectionStatus();
+                    if (wifiConnected) {
+                        wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", getWifiLevel()));
+                        saveLocation(location, getWifiLevel(), getWifiName());
 
-                    wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", getWifiLevel()));
-                    dataTextView.setText(MessageFormat.format("Data Strength: {0}", getDataLevel()));
+                    } else {
+                        wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", "Disconnected"));
+                    }
+                    if (dataConnected) {
+                        dataTextView.setText(MessageFormat.format("Data Strength: {0}", getDataLevel()));
+                        saveLocation(location, getDataLevel(), getDataName());
+                    } else {
+                        dataTextView.setText(MessageFormat.format("Data Strength: {0}", "Disconnected"));
+                    }
 
-                    saveLocation(location, getWifiLevel(), getWifiName());
-                    saveLocation(location, getDataLevel(), getDataName());
                     updateUI();
                 }
             }
@@ -138,6 +167,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         };
     }
+
     public boolean locationPermissionRequest() {
         int fineLocationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION);
         int coarseLocationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION);
@@ -164,18 +194,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
     }
+
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,  @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == 1) {
             if (grantResults.length <= 0) {
 
-            } else if(grantResults[0] == PERMISSION_GRANTED) {
+            } else if (grantResults[0] == PERMISSION_GRANTED) {
                 getLocation();
             } else {
 
             }
         }
     }
+
     private void getLocation() {
 
 
@@ -196,7 +228,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         fusedLocationClient.requestLocationUpdates(locationRequest,
                                 locationCallback,
                                 Looper.getMainLooper());
-                        Log.println(Log.DEBUG,"lol", "lol");
+                        Log.println(Log.DEBUG, "lol", "lol");
                     }
                 }
         );
@@ -205,7 +237,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             public void onFailure(@NonNull Exception e) {
                 if (e instanceof ResolvableApiException) {
                     ResolvableApiException resolvable = (ResolvableApiException) e;
-                    Log.println(Log.DEBUG,"lol2", "lol2");
+                    Log.println(Log.DEBUG, "lol2", "lol2");
 
                 }
             }
@@ -214,23 +246,53 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Looper.myLooper();
 
     }
-    private List<SignalSource> generateSignalSources() {
-        List<SignalSource> sources = new ArrayList<>();
-        /*
-        * get wifi name does not work null
-        * */
-        sources.add(new SignalSource(getWifiName()));
-        sources.add(new SignalSource(getDataName()));
-        return sources;
+
+    private void generateSignalSources() {
+        checkConnectionStatus();
+        if (wifiConnected) {
+            if (checkSources(getWifiName())) {
+
+            } else if (getWifiName() == null) {
+
+            } else {
+                sources.add(new SignalSource(getWifiName()));
+                if(sources.size() == 1) {
+                    currentSource = sources.get(0).getName();
+                }
+            }
+        }
+        if (dataConnected) {
+            if(checkSources(getDataName())) {
+
+            } else if (getDataName() == null) {
+
+            } else {
+                sources.add(new SignalSource(getDataName()));
+                if(sources.size() == 1) {
+                    currentSource = sources.get(0).getName();
+                }
+            }
+
+        }
     }
+
+    private boolean checkSources(String name) {
+        for (SignalSource signalSource : sources) {
+            if (signalSource.getName().equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void updateUI() {
         if (currentLocation != null) {
             mMap.clear();
             currentLatLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
             mMap.addMarker(new MarkerOptions().position(currentLatLng).title("here"));
             List<SignalStrengthLocation> selectedLocaitons = new ArrayList<>();
-            for (SignalSource source: sources) {
-                if(source.getName().equals(currentSource)) {
+            for (SignalSource source : sources) {
+                if (source.getName().equals(currentSource)) {
                     selectedLocaitons = source.getSignalStrengthLocationList();
                 }
             }
@@ -240,83 +302,125 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private void createHeatmap(List<SignalStrengthLocation> locations) {
         List<WeightedLatLng> latLngs = getHeatmapData(locations);
-        int[] colours = {
-                Color.rgb(255,0,0),
+        if(latLngs.size() == 0) {
 
-                Color.rgb(102,225,0)
+        } else {
+            int[] colours = {
+                    Color.rgb(255, 0, 0),
 
-        };
-        float[] startPoints = {
-                0.1f, 0.8f
-        };
-        Gradient gradient = new Gradient(colours, startPoints);
-        heatmapTileProvider = new HeatmapTileProvider.Builder().weightedData(latLngs).radius(50).gradient(gradient).build();
+                    Color.rgb(102, 225, 0)
 
-        overlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProvider));
+            };
+            float[] startPoints = {
+                    0.1f, 0.8f
+            };
+            Gradient gradient = new Gradient(colours, startPoints);
+            heatmapTileProvider = new HeatmapTileProvider.Builder().weightedData(latLngs).radius(50).gradient(gradient).build();
+
+            overlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProvider));
+        }
+
     }
 
     private void changeDataHeatmap(List<SignalStrengthLocation> locations) {
+        createHeatmap(locations);
 
-        if(heatmapTileProvider == null | overlay == null ) {
-            createHeatmap(locations);
-        } else {
-            List<WeightedLatLng> latLngs = getHeatmapData(locations);
-
-            overlay.clearTileCache();
-            heatmapTileProvider.setWeightedData(latLngs);
-        }
     }
+
     private void resetView() {
         CameraPosition cameraPosition;
-        if(mMap == null) {
+        if (mMap == null) {
             return;
         }
-        if(currentLatLng == null) {
-            cameraPosition = CameraPosition.builder().target(new LatLng(0,0)).bearing(0).zoom(0).build();
+        if (currentLatLng == null) {
+            cameraPosition = CameraPosition.builder().target(new LatLng(51, 0)).bearing(0).zoom(5).build();
         } else {
             cameraPosition = CameraPosition.builder().target(currentLatLng).bearing(0).zoom(20).build();
         }
         mMap.moveCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 
     }
+
     private int getWifiLevel() {
         WifiInfo wifiInfo = (WifiInfo) wifi.getConnectionInfo();
         return WifiManager.calculateSignalLevel(wifiInfo.getRssi(), 5);
     }
+
     private String getWifiName() {
         WifiInfo wifiInfo = (WifiInfo) wifi.getConnectionInfo();
-        return wifiInfo.getSSID();
+        checkConnectionStatus();
+        if (wifiConnected) {
+            return wifiInfo.getSSID();
+        } else {
+            return null;
+        }
     }
+
     private String getDataName() {
-        return "data";
+        checkConnectionStatus();
+        if (dataConnected) {
+            return "data";
+        } else {
+            return null;
+        }
+
     }
+
     @RequiresApi(api = Build.VERSION_CODES.P)
     private int getDataLevel() {
         return telephonyManager.getSignalStrength().getLevel();
     }
 
     private void saveLocation(Location location, int level, String name) {
-        SignalStrengthLocation signalStrengthLocation = new SignalStrengthLocation(location, level);
-        int count = 0;
-        for (SignalSource signalSource: sources) {
-            if(signalSource.getName().equals(name)) {
-                signalSource.addSignalStrengthLocation(signalStrengthLocation);
-            } else {
-                count++;
+        if (sources.size() == 0) {
+
+        } else {
+            SignalStrengthLocation signalStrengthLocation = new SignalStrengthLocation(location, level);
+            for (SignalSource signalSource : sources) {
+                if (signalSource.getName().equals(name)) {
+                    signalSource.addSignalStrengthLocation(signalStrengthLocation);
+                }
             }
         }
-        if (sources.size() == count) {
-            sources.add(new SignalSource(name, signalStrengthLocation));
-        }
+
     }
 
     private List<WeightedLatLng> getHeatmapData(List<SignalStrengthLocation> locations) {
         List<WeightedLatLng> heatmapData = new ArrayList<>();
-        for (SignalStrengthLocation location: locations) {
+        for (SignalStrengthLocation location : locations) {
             heatmapData.add(location.getWeightedLatLng());
         }
         return heatmapData;
     }
+
+    private void getNextSource() {
+        String currentSourceTemp = currentSource;
+        for (int i = 0; i < sources.size(); i++) {
+            SignalSource signalSource = sources.get(i);
+            if (signalSource.getName().equals(currentSource)) {
+                if (i + 1 == sources.size()) {
+                    currentSourceTemp = sources.get(0).getName();
+                } else {
+                    currentSourceTemp = sources.get(i + 1).getName();
+                }
+
+            }
+        }
+        currentSource = currentSourceTemp;
+        updateUI();
+
+    }
+
+    private void checkConnectionStatus() {
+        WifiInfo wifiInfo = (WifiInfo) wifi.getConnectionInfo();
+        if (wifiInfo.getSupplicantState().equals(SupplicantState.COMPLETED)) {
+            wifiConnected = true;
+        } else {
+            wifiConnected = false;
+        }
+        dataConnected = telephonyManager.isDataEnabled();
+    }
+
     @Override
     public void onLocationChanged(Location location) {
         currentLocation = location;
@@ -343,7 +447,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onStart();
         locationPermissionRequest();
         getLocation();
-    };
+    }
+
+    ;
 
     /**
      * Manipulates the map once available.
@@ -359,12 +465,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
         resetView();
         List<SignalStrengthLocation> selectedLocaitons = new ArrayList<>();
-        for (SignalSource source: sources) {
-            if(source.getName().equals(currentSource)) {
+        for (SignalSource source : sources) {
+            if (source.getName().equals(currentSource)) {
                 selectedLocaitons = source.getSignalStrengthLocationList();
             }
         }
-        if(selectedLocaitons.size() == 0) {
+        if (selectedLocaitons.size() == 0) {
 
         } else {
             createHeatmap(selectedLocaitons);
@@ -373,6 +479,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         // Add a marker in Sydney and move the camera
     }
+
     @Override
     public void onResume() {
         super.onResume();

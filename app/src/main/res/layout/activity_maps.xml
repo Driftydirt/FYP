@@ -21,6 +21,15 @@
         android:layout_marginBottom="10dp"
         android:text="@string/reset_view" />
 
+    <Button
+        android:id="@+id/button_swap"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|right"
+        android:layout_marginRight="10dp"
+        android:layout_marginBottom="10dp"
+        android:text="Button" />
+
     <TextView
         android:id="@+id/wifi_text"
         android:layout_width="104dp"
@@ -40,4 +49,5 @@
         android:background="?attr/colorButtonNormal"
         android:gravity="top|left"
         android:text="TextView" />
+
 </FrameLayout>
