@@ -4,37 +4,30 @@ package com.example.fyp;
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.fragment.app.FragmentActivity;
-
 import android.Manifest;
 import android.content.Context;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
-import android.net.NetworkInfo;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
-import android.telephony.CellInfo;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
+
+import com.example.fyp.databinding.ActivityMapsBinding;
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -44,7 +37,6 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.SettingsClient;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -52,9 +44,9 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.example.fyp.databinding.ActivityMapsBinding;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
+import com.google.android.gms.maps.model.TileProvider;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -66,10 +58,8 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, LocationListener {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
     private ActivityMapsBinding binding;
@@ -312,34 +302,91 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     selectedLocaitons = source.getSignalStrengthLocationList();
                 }
             }
-            changeDataHeatmap(selectedLocaitons);
+            createHeatmap(selectedLocaitons);
         }
     }
 
     private void createHeatmap(List<SignalStrengthLocation> locations) {
         List<WeightedLatLng> latLngs = getHeatmapData(locations);
+
+
         if (latLngs.size() == 0) {
 
         } else {
-            int[] colours = {
-                    Color.rgb(255, 0, 0),
+            List<WeightedLatLng> levelOneLatLngs = new ArrayList<>();
+            List<WeightedLatLng> levelTwoLatLngs = new ArrayList<>();
+            List<WeightedLatLng> levelThreeLatLngs = new ArrayList<>();
+            List<WeightedLatLng> levelFourLatLngs = new ArrayList<>();
+            for (WeightedLatLng latLng: latLngs) {
+                switch((int) latLng.getIntensity()) {
+                    case 1:
+                        levelOneLatLngs.add(latLng);
+                        break;
+                    case 2:
+                        levelTwoLatLngs.add(latLng);
+                        break;
+                    case 3:
+                        levelThreeLatLngs.add(latLng);
+                        break;
+                    case 4:
+                        levelFourLatLngs.add(latLng);
+                        break;
+                    default:
+                        levelOneLatLngs.add(latLng);
 
-                    Color.rgb(102, 225, 0)
+                }
+            }
 
+            int[] coloursOne = {
+                    Color.rgb(255, 0, 0)
             };
+            int[] coloursTwo = {
+                    Color.rgb(255, 102, 0)
+            };
+            int[] coloursThree = {
+                    Color.rgb(255, 255, 0)
+            };
+            int[] coloursFour = {
+                    Color.rgb(104, 255, 0)
+            };
+
             float[] startPoints = {
-                    0.1f, 0.8f
+                    0.5f
             };
-            Gradient gradient = new Gradient(colours, startPoints);
-            heatmapTileProvider = new HeatmapTileProvider.Builder().weightedData(latLngs).radius(50).gradient(gradient).build();
+            Gradient gradientOne = new Gradient(coloursOne, startPoints);
+            Gradient gradientTwo = new Gradient(coloursTwo, startPoints);
+            Gradient gradientThree = new Gradient(coloursThree, startPoints);
+            Gradient gradientFour = new Gradient(coloursFour, startPoints);
 
+
+/*
+            heatmapTileProvider = new HeatmapTileProvider.Builder().weightedData(latLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradient).build();
+*/
+            if (levelOneLatLngs.size() != 0) {
+                HeatmapTileProvider heatmapTileProviderOne = new HeatmapTileProvider.Builder().weightedData(levelOneLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientOne).build();
+                TileOverlay overlayOne = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderOne));
+
+            }
+            if (levelTwoLatLngs.size() != 0) {
+                HeatmapTileProvider heatmapTileProviderTwo = new HeatmapTileProvider.Builder().weightedData(levelTwoLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientTwo).build();
+                TileOverlay overlayTwo = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderTwo));
+
+            }
+            if (levelThreeLatLngs.size() != 0) {
+                HeatmapTileProvider heatmapTileProviderThree = new HeatmapTileProvider.Builder().weightedData(levelThreeLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientThree).build();
+                TileOverlay overlayThree = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderThree));
+
+            }
+            if (levelFourLatLngs.size() != 0) {
+                HeatmapTileProvider heatmapTileProviderFour = new HeatmapTileProvider.Builder().weightedData(levelFourLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientFour).build();
+                TileOverlay overlayFour = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderFour));
+
+            }
+
+/*
             overlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProvider));
+*/
         }
-
-    }
-
-    private void changeDataHeatmap(List<SignalStrengthLocation> locations) {
-        createHeatmap(locations);
 
     }
 
@@ -435,27 +482,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             wifiConnected = false;
         }
         dataConnected = telephonyManager.isDataEnabled();
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        currentLocation = location;
-        updateUI();
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
