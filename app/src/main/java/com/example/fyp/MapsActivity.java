@@ -46,7 +46,6 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
-import com.google.android.gms.maps.model.TileProvider;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -76,8 +75,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ConnectivityManager connectivityManager;
     private TelephonyManager telephonyManager;
     private List<SignalSource> sources;
-    private HeatmapTileProvider heatmapTileProvider;
-    private TileOverlay overlay;
     private String currentSource;
     private boolean wifiConnected;
     private boolean dataConnected;
@@ -337,56 +334,61 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
 
-            int[] coloursOne = {
-                    Color.rgb(255, 0, 0)
-            };
-            int[] coloursTwo = {
-                    Color.rgb(255, 102, 0)
-            };
-            int[] coloursThree = {
-                    Color.rgb(255, 255, 0)
-            };
-            int[] coloursFour = {
-                    Color.rgb(104, 255, 0)
-            };
-
-            float[] startPoints = {
-                    0.5f
-            };
-            Gradient gradientOne = new Gradient(coloursOne, startPoints);
-            Gradient gradientTwo = new Gradient(coloursTwo, startPoints);
-            Gradient gradientThree = new Gradient(coloursThree, startPoints);
-            Gradient gradientFour = new Gradient(coloursFour, startPoints);
-
-
-/*
-            heatmapTileProvider = new HeatmapTileProvider.Builder().weightedData(latLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradient).build();
-*/
             if (levelOneLatLngs.size() != 0) {
-                HeatmapTileProvider heatmapTileProviderOne = new HeatmapTileProvider.Builder().weightedData(levelOneLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientOne).build();
-                TileOverlay overlayOne = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderOne));
-
+                TileOverlay overlayOne = mMap.addTileOverlay(generateTileOverlayOptions(levelOneLatLngs, 1));
             }
             if (levelTwoLatLngs.size() != 0) {
-                HeatmapTileProvider heatmapTileProviderTwo = new HeatmapTileProvider.Builder().weightedData(levelTwoLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientTwo).build();
-                TileOverlay overlayTwo = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderTwo));
+                TileOverlay overlayOne = mMap.addTileOverlay(generateTileOverlayOptions(levelTwoLatLngs, 2));
 
             }
             if (levelThreeLatLngs.size() != 0) {
-                HeatmapTileProvider heatmapTileProviderThree = new HeatmapTileProvider.Builder().weightedData(levelThreeLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientThree).build();
-                TileOverlay overlayThree = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderThree));
-
+                TileOverlay overlayOne = mMap.addTileOverlay(generateTileOverlayOptions(levelThreeLatLngs, 3));
             }
             if (levelFourLatLngs.size() != 0) {
-                HeatmapTileProvider heatmapTileProviderFour = new HeatmapTileProvider.Builder().weightedData(levelFourLatLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradientFour).build();
-                TileOverlay overlayFour = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProviderFour));
-
+                TileOverlay overlayOne = mMap.addTileOverlay(generateTileOverlayOptions(levelFourLatLngs, 4));
             }
 
-/*
-            overlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(heatmapTileProvider));
-*/
         }
+
+    }
+
+    private TileOverlayOptions generateTileOverlayOptions(List<WeightedLatLng> latLngs, int level) {
+        float[] startPoints = {
+                0.5f
+        };
+        int[] colours;
+        switch (level) {
+            case 1:
+                colours = new int[]{
+                        Color.rgb(255, 0, 0)
+                };
+                break;
+            case 2:
+                colours = new int[]{
+                        Color.rgb(255, 102, 0)
+                };
+                break;
+            case 3:
+                colours = new int[]{
+                        Color.rgb(255, 255, 0)
+                };
+                break;
+            case 4:
+                colours = new int[]{
+                        Color.rgb(104, 255, 0)
+                };
+                break;
+            default:
+                colours = new int[]{
+                        Color.rgb(0, 0, 0)
+                };
+
+        }
+        Gradient gradient = new Gradient(colours, startPoints);
+
+        HeatmapTileProvider heatmapTileProvider = new HeatmapTileProvider.Builder().weightedData(latLngs).radius(35).opacity(0.5).maxIntensity(1).gradient(gradient).build();
+        return new TileOverlayOptions().tileProvider(heatmapTileProvider);
+
 
     }
 
