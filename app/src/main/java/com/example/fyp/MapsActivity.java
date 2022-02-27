@@ -75,6 +75,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ActivityMapsBinding binding;
     private TextView wifiTextView;
     private TextView dataTextView;
+    private TextView heatmapTypeTextView;
     public static Context context;
     private LocationRequest locationRequest;
     private FusedLocationProviderClient fusedLocationClient;
@@ -101,11 +102,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         telephonyManager = (TelephonyManager) context.getSystemService(context.TELEPHONY_SERVICE);
         sources = new ArrayList<>();
-        generateSignalSources();
-
-        if (sources.size() != 0) {
-            currentSource = sources.get(0).getName();
-        }
 
 
         binding = ActivityMapsBinding.inflate(getLayoutInflater());
@@ -117,6 +113,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
         wifiTextView = findViewById(R.id.wifi_text);
+        heatmapTypeTextView = findViewById(R.id.heatmap_type);
+        generateSignalSources();
+
+        if (sources.size() != 0) {
+            currentSource = sources.get(0).getName();
+        }
+
         checkConnectionStatus();
         if (wifiConnected) {
             wifiTextView.setText(MessageFormat.format("Wifi Strength: {0}", getWifiLevel()));
@@ -125,10 +128,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
 
         dataTextView = findViewById(R.id.data_text);
+
         if (dataConnected) {
             dataTextView.setText(MessageFormat.format("Data Strength: {0}", getDataLevel()));
         } else {
             dataTextView.setText(MessageFormat.format("Data Strength: {0}", "Disconnected"));
+        }
+
+        if (currentSource == null) {
+            heatmapTypeTextView.setText("Selected Source: N/A");
+        } else {
+            heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
         }
 
         final Button swap_source = findViewById(R.id.button_swap);
@@ -258,6 +268,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 sources.add(new SignalSource(getWifiName()));
                 if (sources.size() == 1) {
                     currentSource = sources.get(0).getName();
+                    heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+
                 }
             }
         }
@@ -270,6 +282,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 sources.add(new SignalSource(getDataName()));
                 if (sources.size() == 1) {
                     currentSource = sources.get(0).getName();
+                    heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+
                 }
             }
 
@@ -288,6 +302,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void updateUI() {
         if (currentLocation != null) {
             mMap.clear();
+            heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+
             currentLatLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
             mMap.addMarker(new MarkerOptions().position(currentLatLng).title("here"));
             List<SignalStrengthLocation> selectedLocaitons = new ArrayList<>();
