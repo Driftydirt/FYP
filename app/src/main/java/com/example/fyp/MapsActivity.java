@@ -5,16 +5,20 @@ import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
 import android.Manifest;
+import android.app.Notification;
+import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.graphics.Color;
 import android.location.Location;
-import android.location.LocationListener;
-import android.net.ConnectivityManager;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.Looper;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -58,7 +62,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, ServiceConnection {
 
     private GoogleMap mMap;
     private ActivityMapsBinding binding;
@@ -72,12 +76,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private LatLng currentLatLng;
     private Location currentLocation;
     private WifiManager wifi;
-    private ConnectivityManager connectivityManager;
     private TelephonyManager telephonyManager;
     private List<SignalSource> sources;
-    private String currentSource;
+    private SignalSource currentSource;
     private boolean wifiConnected;
     private boolean dataConnected;
+    private Intent intent;
+    private LocationService service;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,7 +91,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         wifi = (WifiManager) context.getSystemService(context.WIFI_SERVICE);
-        connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         telephonyManager = (TelephonyManager) context.getSystemService(context.TELEPHONY_SERVICE);
         sources = new ArrayList<>();
 
@@ -104,7 +108,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         generateSignalSources();
 
         if (sources.size() != 0) {
-            currentSource = sources.get(0).getName();
+            currentSource = sources.get(0);
         }
 
         checkConnectionStatus();
@@ -125,7 +129,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (currentSource == null) {
             heatmapTypeTextView.setText("Selected Source: N/A");
         } else {
-            heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+            heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
         }
 
         final Button swap_source = findViewById(R.id.button_swap);
@@ -156,7 +160,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     } else {
                         dataTextView.setText(MessageFormat.format("Data Strength: {0}", "Disconnected"));
                     }
-
+                    /*
+                    * TODO: find out why location callback is not being run while in background
+                    * */
+                    Log.println(Log.DEBUG, "MapsActivity: LocationCallback", "Success");
                     updateUI();
                 }
             }
@@ -219,22 +226,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         SettingsClient settingsClient = LocationServices.getSettingsClient(this);
         Task<LocationSettingsResponse> task = settingsClient.checkLocationSettings(builder.build());
-        task.addOnSuccessListener(this, new OnSuccessListener<LocationSettingsResponse>() {
-                    @Override
-                    public void onSuccess(LocationSettingsResponse locationSettingsResponse) {
-                        fusedLocationClient.requestLocationUpdates(locationRequest,
-                                locationCallback,
-                                Looper.getMainLooper());
-                        Log.println(Log.DEBUG, "lol", "lol");
-                    }
-                }
+        task.addOnSuccessListener(this, locationSettingsResponse -> {
+            fusedLocationClient.requestLocationUpdates(locationRequest,
+                    locationCallback,
+                    Looper.getMainLooper());
+        }
         );
         task.addOnFailureListener(this, new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception e) {
                 if (e instanceof ResolvableApiException) {
                     ResolvableApiException resolvable = (ResolvableApiException) e;
-                    Log.println(Log.DEBUG, "lol2", "lol2");
 
                 }
             }
@@ -254,8 +256,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else {
                 sources.add(new SignalSource(getWifiName()));
                 if (sources.size() == 1) {
-                    currentSource = sources.get(0).getName();
-                    heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+                    currentSource = sources.get(0);
+                    heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
 
                 }
             }
@@ -268,8 +270,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else {
                 sources.add(new SignalSource(getDataName()));
                 if (sources.size() == 1) {
-                    currentSource = sources.get(0).getName();
-                    heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+                    currentSource = sources.get(0);
+                    heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
 
                 }
             }
@@ -287,15 +289,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void updateUI() {
-        if (currentLocation != null) {
+        if (currentLocation != null & currentSource != null) {
             mMap.clear();
-            heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource));
+            heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
 
             currentLatLng = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
             mMap.addMarker(new MarkerOptions().position(currentLatLng).title("here"));
             List<SignalStrengthLocation> selectedLocaitons = new ArrayList<>();
             for (SignalSource source : sources) {
-                if (source.getName().equals(currentSource)) {
+                if (source.equals(currentSource)) {
                     selectedLocaitons = source.getSignalStrengthLocationList();
                 }
             }
@@ -436,11 +438,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         return telephonyManager.getSignalStrength().getLevel();
     }
 
+    /*
+        TODO: find out how to implement docker and host docker container with server
+    */
     private void saveLocation(Location location, int level, String name) {
         if (sources.size() == 0) {
 
         } else {
-            SignalStrengthLocation signalStrengthLocation = new SignalStrengthLocation(location, level);
+            SignalStrengthLocation signalStrengthLocation = new SignalStrengthLocation(location, level, name);
             for (SignalSource signalSource : sources) {
                 if (signalSource.getName().equals(name)) {
                     signalSource.addSignalStrengthLocation(signalStrengthLocation);
@@ -459,14 +464,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void getNextSource() {
-        String currentSourceTemp = currentSource;
+        SignalSource currentSourceTemp = currentSource;
         for (int i = 0; i < sources.size(); i++) {
             SignalSource signalSource = sources.get(i);
-            if (signalSource.getName().equals(currentSource)) {
+            if (signalSource.equals(currentSource)) {
                 if (i + 1 == sources.size()) {
-                    currentSourceTemp = sources.get(0).getName();
+                    currentSourceTemp = sources.get(0);
                 } else {
-                    currentSourceTemp = sources.get(i + 1).getName();
+                    currentSourceTemp = sources.get(i + 1);
                 }
 
             }
@@ -510,7 +515,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         resetView();
         List<SignalStrengthLocation> selectedLocaitons = new ArrayList<>();
         for (SignalSource source : sources) {
-            if (source.getName().equals(currentSource)) {
+            if (source.equals(currentSource)) {
                 selectedLocaitons = source.getSignalStrengthLocationList();
             }
         }
@@ -528,6 +533,41 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onResume() {
         super.onResume();
         resetView();
+        getLocation();
+        if (service != null) {
+            context.unbindService(this);
+            context.stopService(intent);
+            sources = service.getSources();
+            currentSource = service.getCurrentSource();
+            service = null;
+        }
+
+    }
+
+    @Override
+    public void onPause() {
+        startService();
+        fusedLocationClient.removeLocationUpdates(locationCallback);
+
+        super.onPause();
+    }
+    private void startService() {
+
+        intent = new Intent(context,LocationService.class);
+        context.startService(intent);
+        context.bindService(intent, this, context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder binder) {
+        LocationService.MyBinder b = (LocationService.MyBinder) binder;
+        service = b.getService();
+        service.setSources(sources);
+
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
 
     }
 }
