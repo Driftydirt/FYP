@@ -44,6 +44,7 @@ public class LocationService extends Service {
     private SignalSource currentSource;
     private LocationRequest locationRequest;
     private FusedLocationProviderClient fusedLocationClient;
+    private DatabaseInterface dbInterface;
 
     public LocationService() {}
 
@@ -108,6 +109,10 @@ public class LocationService extends Service {
         return mBinder;
     }
 
+    public void seDatabaseInterface(DatabaseInterface dbInterface) {
+        this.dbInterface = dbInterface;
+    }
+
     public class MyBinder extends Binder {
         LocationService getService() {
             return LocationService.this;
@@ -142,7 +147,7 @@ public class LocationService extends Service {
             } else if (getWifiName() == null) {
 
             } else {
-                sources.add(new SignalSource(getWifiName()));
+                sources.add(new SignalSource(getWifiName(), dbInterface));
                 if (sources.size() == 1) {
                     currentSource = sources.get(0);
                 }
@@ -154,7 +159,7 @@ public class LocationService extends Service {
             } else if (getDataName() == null) {
 
             } else {
-                sources.add(new SignalSource(getDataName()));
+                sources.add(new SignalSource(getDataName(), dbInterface));
                 if (sources.size() == 1) {
                     currentSource = sources.get(0);
                 }
@@ -232,6 +237,10 @@ public class LocationService extends Service {
 
     public List<SignalSource> getSources() {
         return sources;
+    }
+
+    public void setCurrentSource(SignalSource currentSource) {
+        this.currentSource = currentSource;
     }
 
     public SignalSource getCurrentSource() {

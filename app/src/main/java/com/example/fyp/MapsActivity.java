@@ -5,8 +5,6 @@ import static android.content.pm.PackageManager.PERMISSION_DENIED;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
 import android.Manifest;
-import android.app.Notification;
-import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -51,7 +49,6 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.maps.android.heatmaps.Gradient;
 import com.google.maps.android.heatmaps.HeatmapTileProvider;
@@ -83,10 +80,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private boolean dataConnected;
     private Intent intent;
     private LocationService service;
+    private DatabaseInterface dbInterface;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d("MapsActivity", "Start" );
+
         context = getApplicationContext();
 
 
@@ -105,6 +105,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment.getMapAsync(this);
         wifiTextView = findViewById(R.id.wifi_text);
         heatmapTypeTextView = findViewById(R.id.heatmap_type);
+        dbInterface = new DatabaseInterface();
+        dbInterface.getSignalStrengthLocationDB();
         generateSignalSources();
 
         if (sources.size() != 0) {
@@ -160,9 +162,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     } else {
                         dataTextView.setText(MessageFormat.format("Data Strength: {0}", "Disconnected"));
                     }
-                    /*
-                    * TODO: find out why location callback is not being run while in background
-                    * */
                     Log.println(Log.DEBUG, "MapsActivity: LocationCallback", "Success");
                     updateUI();
                 }
@@ -254,7 +253,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else if (getWifiName() == null) {
 
             } else {
-                sources.add(new SignalSource(getWifiName()));
+                Log.d("MapsActivity", "Added source " + getWifiName());
+
+                sources.add(new SignalSource(getWifiName(), dbInterface));
                 if (sources.size() == 1) {
                     currentSource = sources.get(0);
                     heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
@@ -268,7 +269,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else if (getDataName() == null) {
 
             } else {
-                sources.add(new SignalSource(getDataName()));
+                Log.d("MapsActivity", "Added source " + getDataName());
+
+                sources.add(new SignalSource(getDataName(), dbInterface));
                 if (sources.size() == 1) {
                     currentSource = sources.get(0);
                     heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
@@ -438,19 +441,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         return telephonyManager.getSignalStrength().getLevel();
     }
 
-    /*
-        TODO: find out how to implement docker and host docker container with server
-    */
     private void saveLocation(Location location, int level, String name) {
         if (sources.size() == 0) {
 
         } else {
             SignalStrengthLocation signalStrengthLocation = new SignalStrengthLocation(location, level, name);
-            for (SignalSource signalSource : sources) {
-                if (signalSource.getName().equals(name)) {
-                    signalSource.addSignalStrengthLocation(signalStrengthLocation);
-                }
-            }
+            dbInterface.addSignalStrengthLocationDB(signalStrengthLocation);
         }
 
     }
@@ -458,7 +454,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private List<WeightedLatLng> getHeatmapData(List<SignalStrengthLocation> locations) {
         List<WeightedLatLng> heatmapData = new ArrayList<>();
         for (SignalStrengthLocation location : locations) {
-            heatmapData.add(location.getWeightedLatLng());
+            heatmapData.add(location.generateWeightedLatLng());
         }
         return heatmapData;
     }
@@ -534,11 +530,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onResume();
         resetView();
         getLocation();
+
         if (service != null) {
-            context.unbindService(this);
-            context.stopService(intent);
             sources = service.getSources();
             currentSource = service.getCurrentSource();
+            context.unbindService(this);
+            context.stopService(intent);
             service = null;
         }
 
@@ -563,6 +560,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LocationService.MyBinder b = (LocationService.MyBinder) binder;
         service = b.getService();
         service.setSources(sources);
+        service.setCurrentSource(currentSource);
+        service.seDatabaseInterface(dbInterface);
 
     }
 
