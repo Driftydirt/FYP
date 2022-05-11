@@ -2,4 +2,9 @@
     <string name="app_name">FYP</string>
     <string name="title_activity_maps">MapsActivity</string>
     <string name="reset_view">Reset View</string>
+    <string name="default_web_client_id2">312312203115-v6c79tc71hf2bmtt08dm54o5ai992grf.apps.googleusercontent.com</string>
+    <string name="switch_source">Switch Source</string>
+    <string name="sign_out">Sign Out</string>
+    <string name="save">Save</string>
+
 </resources>

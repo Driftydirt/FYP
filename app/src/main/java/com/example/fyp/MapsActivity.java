@@ -23,6 +23,8 @@ import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
@@ -30,6 +32,10 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import com.example.fyp.databinding.ActivityMapsBinding;
+import com.firebase.ui.auth.AuthUI;
+import com.firebase.ui.auth.FirebaseAuthUIActivityResultContract;
+import com.firebase.ui.auth.IdpResponse;
+import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult;
 import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -48,8 +54,11 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.maps.android.heatmaps.Gradient;
 import com.google.maps.android.heatmaps.HeatmapTileProvider;
 import com.google.maps.android.heatmaps.WeightedLatLng;
@@ -66,6 +75,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private TextView wifiTextView;
     private TextView dataTextView;
     private TextView heatmapTypeTextView;
+    private TextView currentUserTextView;
     public static Context context;
     private LocationRequest locationRequest;
     private FusedLocationProviderClient fusedLocationClient;
@@ -81,6 +91,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private Intent intent;
     private LocationService service;
     private DatabaseInterface dbInterface;
+    private final ActivityResultLauncher<Intent> signInLauncher = registerForActivityResult(
+            new FirebaseAuthUIActivityResultContract(),
+            new ActivityResultCallback<FirebaseAuthUIAuthenticationResult>() {
+                @Override
+                public void onActivityResult(FirebaseAuthUIAuthenticationResult result) {
+                    onSignInResult(result);
+                }
+            }
+    );
+    private User currentUser;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,6 +114,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         telephonyManager = (TelephonyManager) context.getSystemService(context.TELEPHONY_SERVICE);
         sources = new ArrayList<>();
 
+        List<AuthUI.IdpConfig> providers = Arrays.asList(
+                new AuthUI.IdpConfig.EmailBuilder().build(),
+                new AuthUI.IdpConfig.GoogleBuilder().build());
+
+// Create and launch sign-in intent
+        Intent signInIntent = AuthUI.getInstance()
+                .createSignInIntentBuilder()
+                .setAvailableProviders(providers)
+                .build();
+        signInLauncher.launch(signInIntent);
 
         binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -105,6 +135,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment.getMapAsync(this);
         wifiTextView = findViewById(R.id.wifi_text);
         heatmapTypeTextView = findViewById(R.id.heatmap_type);
+        currentUserTextView = findViewById(R.id.CurrentUser);
         dbInterface = new DatabaseInterface();
         dbInterface.getSignalStrengthLocationDB();
         generateSignalSources();
@@ -134,8 +165,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
         }
 
+        final Button save = findViewById(R.id.save);
         final Button swap_source = findViewById(R.id.button_swap);
+        final Button sign_out = findViewById(R.id.sign_out);
+        sign_out.setOnClickListener(v -> signOut());
         swap_source.setOnClickListener(v -> getNextSource());
+        save.setOnClickListener(v -> save());
         final Button button = findViewById(R.id.location);
         button.setOnClickListener(v -> resetView());
         locationCallback = new LocationCallback() {
@@ -169,6 +204,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
 
         };
+    }
+
+    private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
+        IdpResponse response = result.getIdpResponse();
+        if (result.getResultCode() == RESULT_OK) {
+            // Successfully signed in
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            currentUser = new User(user, dbInterface);
+            // ...
+        } else {
+            // Sign in failed. If response is null the user canceled the
+            // sign-in flow using the back button. Otherwise check
+            // response.getError().getErrorCode() and handle the error.
+            // ...
+        }
+    }
+
+    private void signOut() {
+        AuthUI.getInstance()
+                .signOut(this)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    public void onComplete(@NonNull Task<Void> task) {
+                        currentUser = null;
+                    }
+                });
     }
 
     public boolean locationPermissionRequest() {
@@ -245,6 +305,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+    public void save() {
+        currentUser.saveUser();
+    }
+
     private void generateSignalSources() {
         checkConnectionStatus();
         if (wifiConnected) {
@@ -253,9 +317,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else if (getWifiName() == null) {
 
             } else {
-                Log.d("MapsActivity", "Added source " + getWifiName());
+                SignalSource source = new SignalSource(getWifiName(), dbInterface);
 
-                sources.add(new SignalSource(getWifiName(), dbInterface));
+                Log.d("MapsActivity", "Added source " + getWifiName());
+                if (currentUser != null) {
+                    currentUser.addSignalSource(source);
+
+                }
+                sources.add(source);
+
                 if (sources.size() == 1) {
                     currentSource = sources.get(0);
                     heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
@@ -269,7 +339,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             } else if (getDataName() == null) {
 
             } else {
+                SignalSource source = new SignalSource(getDataName(), dbInterface);
+
                 Log.d("MapsActivity", "Added source " + getDataName());
+                if (currentUser != null) {
+                    currentUser.addSignalSource(source);
+
+                }
 
                 sources.add(new SignalSource(getDataName(), dbInterface));
                 if (sources.size() == 1) {
@@ -279,6 +355,23 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
 
+        }
+
+        if (sources != null) {
+            if(currentUser != null) {
+                currentUser.addSignalSource(sources);
+            }
+        }
+
+        if (currentUser != null) {
+            dbInterface.getSignalSourceDB(currentUser.getUid(), dbInterface);
+            List<String> sourcesNames = new ArrayList<>();
+            sources.forEach((n) -> sourcesNames.add(n.getName()));
+            for (SignalSource signalSource : currentUser.getSignalSourcesList()) {
+                if (!sourcesNames.contains(signalSource.getName())) {
+                    sources.add(signalSource);
+                }
+            }
         }
     }
 

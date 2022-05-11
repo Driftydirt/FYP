@@ -22,14 +22,31 @@
         android:text="@string/reset_view" />
 
     <Button
+        android:id="@+id/sign_out"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|left"
+        android:layout_marginLeft="10dp"
+        android:layout_marginBottom="70dp"
+        android:text="@string/sign_out" />
+
+    <Button
+        android:id="@+id/save"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|left"
+        android:layout_marginLeft="10dp"
+        android:layout_marginBottom="120dp"
+        android:text="@string/save" />
+
+    <Button
         android:id="@+id/button_swap"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|right"
         android:layout_marginRight="10dp"
         android:layout_marginBottom="10dp"
-        android:text="Button" />
-
+        android:text="@string/switch_source" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -62,6 +79,16 @@
             android:background="?attr/colorButtonNormal"
             android:gravity="top|left"
             android:text="TextView" />
+
+        <TextView
+            android:id="@+id/CurrentUser"
+            android:layout_width="match_parent"
+            android:layout_height="47dp"
+            android:layout_weight="0.2"
+            android:background="?attr/colorButtonNormal"
+            android:gravity="top|left"
+            android:text="TextView" />
+
 
     </LinearLayout>
 </FrameLayout>
