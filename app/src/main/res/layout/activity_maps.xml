@@ -80,15 +80,6 @@
             android:gravity="top|left"
             android:text="TextView" />
 
-        <TextView
-            android:id="@+id/CurrentUser"
-            android:layout_width="match_parent"
-            android:layout_height="47dp"
-            android:layout_weight="0.2"
-            android:background="?attr/colorButtonNormal"
-            android:gravity="top|left"
-            android:text="TextView" />
-
 
     </LinearLayout>
 </FrameLayout>
