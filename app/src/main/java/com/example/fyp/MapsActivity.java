@@ -135,7 +135,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment.getMapAsync(this);
         wifiTextView = findViewById(R.id.wifi_text);
         heatmapTypeTextView = findViewById(R.id.heatmap_type);
-        currentUserTextView = findViewById(R.id.CurrentUser);
         dbInterface = new DatabaseInterface();
         dbInterface.getSignalStrengthLocationDB();
         generateSignalSources();
@@ -522,7 +521,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private String getDataName() {
         checkConnectionStatus();
         if (dataConnected) {
-            return "data";
+            return telephonyManager.getNetworkOperatorName();
         } else {
             return null;
         }
@@ -531,6 +530,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @RequiresApi(api = Build.VERSION_CODES.P)
     private int getDataLevel() {
+        Log.d("Telephony", telephonyManager.getNetworkOperatorName());
         return telephonyManager.getSignalStrength().getLevel();
     }
 
