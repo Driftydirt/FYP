@@ -205,7 +205,7 @@ public class LocationService extends Service {
     private String getDataName() {
         checkConnectionStatus();
         if (dataConnected) {
-            return "data";
+            return telephonyManager.getNetworkOperatorName();
         } else {
             return null;
         }
