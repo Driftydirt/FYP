@@ -196,6 +196,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     } else {
                         dataTextView.setText(MessageFormat.format("Data Strength: {0}", "Disconnected"));
                     }
+                    dbInterface.getSignalStrengthLocationDB();
+
                     Log.println(Log.DEBUG, "MapsActivity: LocationCallback", "Success");
                     updateUI();
                 }

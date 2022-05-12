@@ -29,6 +29,7 @@ public class DatabaseInterface {
     public DatabaseInterface() {
         db = FirebaseFirestore.getInstance();
         signalSourcesList = new ArrayList<>();
+        signalStrengthLocationList = new ArrayList<>();
 
     }
 
@@ -78,47 +79,53 @@ public class DatabaseInterface {
     }
 
     public void getSignalStrengthLocationDB() {
-        signalStrengthLocationList = new ArrayList<>();
-        Query signalStrengthLocationsQuery = db.collection("signal_strength_location");
-        registration = signalStrengthLocationsQuery.addSnapshotListener(new EventListener<QuerySnapshot>() {
-            @Override
-            public void onEvent(@Nullable QuerySnapshot value, @Nullable FirebaseFirestoreException error) {
-                if(error != null) {
-                    Log.w(TAG, "listen:error", error);
-                    return;
-                }
+        List<String> names = new ArrayList<>();
+        for (SignalSource source: signalSourcesList) {
+            names.add(source.getName());
+        }
+        if (names.size() > 0) {
+            Query signalStrengthLocationsQuery = db.collection("signal_strength_location").whereIn("name", names);
+            registration = signalStrengthLocationsQuery.addSnapshotListener(new EventListener<QuerySnapshot>() {
+                @Override
+                public void onEvent(@Nullable QuerySnapshot value, @Nullable FirebaseFirestoreException error) {
+                    if(error != null) {
+                        Log.w(TAG, "listen:error", error);
+                        return;
+                    }
 
-                for (DocumentChange dc: value.getDocumentChanges()) {
-                    switch (dc.getType()) {
-                        case ADDED:
-                            signalStrengthLocationList.add(dc.getDocument().toObject(SignalStrengthLocation.class));
-                            Log.d(TAG, "Added " + dc.getDocument().getId() + " => " + dc.getDocument().getData());
-                            break;
-                        case MODIFIED:
-                            SignalStrengthLocation signalStrengthLocation = dc.getDocument().toObject(SignalStrengthLocation.class);
-                            for (int i = 0; i < signalStrengthLocationList.size(); i++) {
-                                if(signalStrengthLocationList.get(i).getCreationTime() == signalStrengthLocation.getCreationTime() & signalStrengthLocationList.get(i).getName() == signalStrengthLocation.getName()) {
-                                    signalStrengthLocationList.set(i, signalStrengthLocation);
+                    for (DocumentChange dc: value.getDocumentChanges()) {
+                        switch (dc.getType()) {
+                            case ADDED:
+                                signalStrengthLocationList.add(dc.getDocument().toObject(SignalStrengthLocation.class));
+                                Log.d(TAG, "Added " + dc.getDocument().getId() + " => " + dc.getDocument().getData());
+                                break;
+                            case MODIFIED:
+                                SignalStrengthLocation signalStrengthLocation = dc.getDocument().toObject(SignalStrengthLocation.class);
+                                for (int i = 0; i < signalStrengthLocationList.size(); i++) {
+                                    if(signalStrengthLocationList.get(i).getCreationTime() == signalStrengthLocation.getCreationTime() & signalStrengthLocationList.get(i).getName() == signalStrengthLocation.getName()) {
+                                        signalStrengthLocationList.set(i, signalStrengthLocation);
+                                    }
                                 }
-                            }
-                            Log.d(TAG, "Changed " + dc.getDocument().getId() + " => " + dc.getDocument().getData());
-                            break;
-                        case REMOVED:
-                            SignalStrengthLocation signalStrengthLocationRemoved = dc.getDocument().toObject(SignalStrengthLocation.class);
+                                Log.d(TAG, "Changed " + dc.getDocument().getId() + " => " + dc.getDocument().getData());
+                                break;
+                            case REMOVED:
+                                SignalStrengthLocation signalStrengthLocationRemoved = dc.getDocument().toObject(SignalStrengthLocation.class);
 
-                            for (int i = 0; i < signalStrengthLocationList.size(); i++) {
-                                if(signalStrengthLocationList.get(i).getCreationTime() == signalStrengthLocationRemoved.getCreationTime()) {
-                                    signalStrengthLocationList.remove(i);
+                                for (int i = 0; i < signalStrengthLocationList.size(); i++) {
+                                    if(signalStrengthLocationList.get(i).getCreationTime() == signalStrengthLocationRemoved.getCreationTime()) {
+                                        signalStrengthLocationList.remove(i);
+                                    }
                                 }
-                            }
-                            Log.d(TAG, "Removed " + dc.getDocument().getId() + " => " + dc.getDocument().getData());
-                            break;
+                                Log.d(TAG, "Removed " + dc.getDocument().getId() + " => " + dc.getDocument().getData());
+                                break;
 
 
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+
     }
 
     public void stopDatabaseListener() {
@@ -137,7 +144,7 @@ public class DatabaseInterface {
 
 
                         for (String signalSource : document.toObject(UserDB.class).getSignalSourcesListNames()) {
-                            if (!signalSourcesList.contains(signalSource)) {
+                            if (!signalSourcesList.stream().anyMatch(s -> s.getName().equals(signalSource))) {
                                 signalSourcesList.add(new SignalSource(signalSource, dbInterface));
                             }
                         }
