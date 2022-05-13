@@ -164,12 +164,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
         }
 
-        final Button save = findViewById(R.id.save);
         final Button swap_source = findViewById(R.id.button_swap);
         final Button sign_out = findViewById(R.id.sign_out);
         sign_out.setOnClickListener(v -> signOut());
         swap_source.setOnClickListener(v -> getNextSource());
-        save.setOnClickListener(v -> save());
         final Button button = findViewById(R.id.location);
         button.setOnClickListener(v -> resetView());
         locationCallback = new LocationCallback() {
@@ -304,10 +302,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         Looper.myLooper();
 
-    }
-
-    public void save() {
-        currentUser.saveUser();
     }
 
     private void generateSignalSources() {

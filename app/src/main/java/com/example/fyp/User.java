@@ -76,7 +76,4 @@ public class User {
         return names;
     }
 
-    public void saveUser() {
-        this.dbInterface.addUserDB(this);
-    }
 }
