@@ -16,6 +16,7 @@ public class SignalSource {
 
         this.db = db;
         this.signalStrengthLocationList = db.getSignalStrengthLocationByName(name);
+        this.db.addSignalSource(this);
     }
 
     public SignalSource(String name, List<SignalStrengthLocation> signalStrengthLocationList) {

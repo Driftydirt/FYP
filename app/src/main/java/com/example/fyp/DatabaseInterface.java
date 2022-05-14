@@ -167,4 +167,8 @@ public class DatabaseInterface {
         }
         return locations;
     }
+
+    public void addSignalSource(SignalSource signalSource) {
+        signalSourcesList.add(signalSource);
+    }
 }
