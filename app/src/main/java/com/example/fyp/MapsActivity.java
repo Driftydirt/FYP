@@ -76,6 +76,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private TextView dataTextView;
     private TextView heatmapTypeTextView;
     private TextView currentUserTextView;
+    private Button sign_out;
     public static Context context;
     private LocationRequest locationRequest;
     private FusedLocationProviderClient fusedLocationClient;
@@ -114,16 +115,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         telephonyManager = (TelephonyManager) context.getSystemService(context.TELEPHONY_SERVICE);
         sources = new ArrayList<>();
 
-        List<AuthUI.IdpConfig> providers = Arrays.asList(
-                new AuthUI.IdpConfig.EmailBuilder().build(),
-                new AuthUI.IdpConfig.GoogleBuilder().build());
-
-// Create and launch sign-in intent
-        Intent signInIntent = AuthUI.getInstance()
-                .createSignInIntentBuilder()
-                .setAvailableProviders(providers)
-                .build();
-        signInLauncher.launch(signInIntent);
+        signIn();
 
         binding = ActivityMapsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -164,9 +156,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             heatmapTypeTextView.setText(MessageFormat.format("Selected Source: {0}", currentSource.getName()));
         }
 
+        sign_out = findViewById(R.id.sign_out);
+
+        if (currentUser != null) {
+            sign_out.setOnClickListener(v -> signOut());
+        } else {
+            sign_out.setOnClickListener(v -> signIn());
+        }
         final Button swap_source = findViewById(R.id.button_swap);
-        final Button sign_out = findViewById(R.id.sign_out);
-        sign_out.setOnClickListener(v -> signOut());
+
         swap_source.setOnClickListener(v -> getNextSource());
         final Button button = findViewById(R.id.location);
         button.setOnClickListener(v -> resetView());
@@ -205,12 +203,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         };
     }
 
+    private void signIn() {
+        List<AuthUI.IdpConfig> providers = Arrays.asList(
+                new AuthUI.IdpConfig.EmailBuilder().build(),
+                new AuthUI.IdpConfig.GoogleBuilder().build());
+
+// Create and launch sign-in intent
+        Intent signInIntent = AuthUI.getInstance()
+                .createSignInIntentBuilder()
+                .setAvailableProviders(providers)
+                .build();
+        signInLauncher.launch(signInIntent);
+    }
+
     private void onSignInResult(FirebaseAuthUIAuthenticationResult result) {
         IdpResponse response = result.getIdpResponse();
         if (result.getResultCode() == RESULT_OK) {
             // Successfully signed in
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
             currentUser = new User(user, dbInterface);
+            sign_out.setOnClickListener(v -> signOut());
+            sign_out.setText("Sign Out");
             // ...
         } else {
             // Sign in failed. If response is null the user canceled the
@@ -221,10 +234,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void signOut() {
-        if(currentUser != null) {
-            currentSource = null;
-            sources = new ArrayList<>();
-        }
+        currentSource = null;
+        sources = new ArrayList<>();
         AuthUI.getInstance()
                 .signOut(this)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -232,6 +243,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         currentUser = null;
                     }
                 });
+        dbInterface.signOut();
+        sign_out.setOnClickListener(v -> signIn());
+        sign_out.setText("Sign In");
 
     }
 
@@ -370,6 +384,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             for (SignalSource signalSource : currentUser.getSignalSourcesList()) {
                 if (!sourcesNames.contains(signalSource.getName())) {
                     sources.add(signalSource);
+                    sources.forEach((n) -> sourcesNames.add(n.getName()));
                 }
             }
         }

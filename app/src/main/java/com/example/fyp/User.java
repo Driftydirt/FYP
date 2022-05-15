@@ -64,7 +64,7 @@ public class User {
     }
 
     public List<SignalSource> getSignalSourcesList() {
-        addSignalSource(dbInterface.getSignalSourcesList());
+        this.addSignalSource(dbInterface.getSignalSourcesList());
         return signalSourcesList;
     }
 

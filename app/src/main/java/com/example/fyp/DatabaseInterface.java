@@ -169,6 +169,13 @@ public class DatabaseInterface {
     }
 
     public void addSignalSource(SignalSource signalSource) {
-        signalSourcesList.add(signalSource);
+        if (!signalSourcesList.stream().anyMatch(s -> s.getName().equals(signalSource.getName()))) {
+            signalSourcesList.add(signalSource);
+
+        }
+    }
+
+    public void signOut() {
+        this.signalSourcesList = new ArrayList<>();
     }
 }
