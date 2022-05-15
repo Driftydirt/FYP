@@ -221,6 +221,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void signOut() {
+        if(currentUser != null) {
+            currentSource = null;
+            sources = new ArrayList<>();
+        }
         AuthUI.getInstance()
                 .signOut(this)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -228,6 +232,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         currentUser = null;
                     }
                 });
+
     }
 
     public boolean locationPermissionRequest() {
